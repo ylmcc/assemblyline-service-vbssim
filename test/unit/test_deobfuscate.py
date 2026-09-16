@@ -6,6 +6,7 @@ from vbssim_service.deobfuscate import (
     extract_ordered_base64_chunks,
     reconstruct_embedded_payload,
 )
+from vbssim_service.scanner import extract_powershell_invoke_literals, scan
 
 # A synthetic, obviously-not-real filler pattern -- distinct from (and shorter than)
 # the real ~15-character Unicode filler observed on the real sample, but shaped the
@@ -74,3 +75,24 @@ def test_reconstruct_embedded_payload_without_filler_still_works():
     decoded, filler_result = reconstruct_embedded_payload(b64, min_repeats=10)
     assert decoded == _SYNTHETIC_PAYLOAD
     assert filler_result.filler is None
+
+
+def test_cleaned_text_reveals_findings_hidden_by_filler():
+    # Real bug found on a live submission: the junk filler observed on a real
+    # sample is interspersed through the *entire* script, not just the embedded
+    # base64 payload -- so a reflective-invoke call site (and its candidate
+    # ciphertext argument) is itself filler-obfuscated and invisible to scan()/
+    # extract_powershell_invoke_literals() unless they're run against
+    # filler_result.cleaned_text rather than the raw script text.
+    script = 'powershell -Command "[AppDomain]::CurrentDomain.Load([Convert]::FromBase64String(\'' \
+        + "A" * 250 + "'))\""
+    obfuscated = _interspersed(script, _SYNTHETIC_FILLER)
+    _, filler_result = reconstruct_embedded_payload(obfuscated, min_repeats=10)
+    assert filler_result.filler == _SYNTHETIC_FILLER
+
+    assert scan(obfuscated) == []
+    assert extract_powershell_invoke_literals(obfuscated) == []
+
+    kinds = [f.kind for f in scan(filler_result.cleaned_text)]
+    assert "reflective_dotnet_load" in kinds
+    assert extract_powershell_invoke_literals(filler_result.cleaned_text)

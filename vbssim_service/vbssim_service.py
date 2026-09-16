@@ -77,13 +77,21 @@ class VBSSim(ServiceBase):
             filler_section.set_heuristic(1, signature="junk_filler_obfuscation")
             result.add_section(filler_section)
 
+        # Scan the de-fillered text, not the raw text -- on a real sample the junk
+        # filler is interspersed through the *entire* file, not just the base64
+        # payload blob, so a reflective-invoke literal like `[Foo.Bar]::Baz("...")`
+        # is itself filler-obfuscated and never matches against raw `text`.
+        # detect_and_strip_filler() returns the original text unchanged when no
+        # filler is detected, so this is always safe to use.
+        clean_text = filler_result.cleaned_text
+
         # temp_submission_data must be set BEFORE add_extracted() -- it propagates to
         # the *subsequent tasks resulting from* adding an extracted file, so setting
         # it after the child task was already created misses the child entirely.
         # (Real bug found this session: DotnetConfigDecryptor never saw these
         # literals on a live submission because this was originally ordered the
         # other way around.)
-        invoke_literals = extract_powershell_invoke_literals(text)
+        invoke_literals = extract_powershell_invoke_literals(clean_text)
         candidate_ciphertexts = sorted({
             literal for inv in invoke_literals for literal in inv["candidate_literals"]
         })
@@ -110,7 +118,7 @@ class VBSSim(ServiceBase):
                 result.add_section(payload_section)
                 audit_log["decoded_payload_sniffed_type"] = sniffed_type
 
-        findings = scan(text)
+        findings = scan(clean_text)
         by_kind: dict[str, list] = {}
         for finding in findings:
             by_kind.setdefault(finding.kind, []).append(finding)
