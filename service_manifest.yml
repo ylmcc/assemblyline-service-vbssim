@@ -1,13 +1,17 @@
 name: VBSSim
 version: $SERVICE_TAG
 description: >
-  Statically detects and undoes a real, observed VBScript obfuscation technique
-  (interspersing every real character of an embedded base64 payload with a long
-  junk filler, to defeat naive string/YARA extraction), reconstructs and extracts
-  the hidden payload, and recognizes -- without ever performing -- dangerous
-  WSH/PowerShell idioms: hidden-window WMI process creation, reflective .NET
-  assembly loading, VBScript's own dynamic-code-execution builtins, and
-  corroborated scheduled-task persistence. No VBScript interpreter is ever invoked.
+  Statically detects and undoes three real, observed VBScript junk-filler
+  obfuscation techniques -- interspersing every character of an embedded base64
+  payload with a long filler; splicing a short marker token into otherwise-
+  plaintext/hex string fragments passed to a custom "decode" function; and
+  splitting a base64 blob across many lines each prefixed with a repeated marker
+  mimicking a real PowerShell/Authenticode "signature block" -- reconstructs and
+  extracts the hidden payload, and recognizes -- without ever performing --
+  dangerous WSH/PowerShell idioms: hidden-window WMI process creation, reflective
+  .NET assembly loading, VBScript's own dynamic-code-execution builtins,
+  corroborated scheduled-task persistence, and a fake/inapplicable digital-
+  signature block used as camouflage. No VBScript interpreter is ever invoked.
 
 accepts: code/vbs
 rejects: empty|metadata/.*
