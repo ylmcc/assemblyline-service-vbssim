@@ -1,0 +1,82 @@
+name: VBSSim
+version: $SERVICE_TAG
+description: >
+  Statically detects and undoes a real, observed VBScript obfuscation technique
+  (interspersing every real character of an embedded base64 payload with a long
+  junk filler, to defeat naive string/YARA extraction), reconstructs and extracts
+  the hidden payload, and recognizes -- without ever performing -- dangerous
+  WSH/PowerShell idioms: hidden-window WMI process creation, reflective .NET
+  assembly loading, VBScript's own dynamic-code-execution builtins, and
+  corroborated scheduled-task persistence. No VBScript interpreter is ever invoked.
+
+accepts: code/vbs
+rejects: empty|metadata/.*
+
+stage: CORE
+category: Static Analysis
+file_required: true
+timeout: 120
+disable_cache: false
+enabled: true
+is_external: false
+licence_count: 0
+
+submission_params:
+  - name: min_filler_repeats
+    type: int
+    default: 50
+    value: 50
+
+heuristics:
+  - heur_id: 1
+    name: Junk-character obfuscation detected and stripped
+    description: A highly-repeated, deliberately unusual junk filler string was found interspersed between the characters of a likely base64-encoded embedded payload, to defeat naive string/YARA extraction.
+    filetype: ".*"
+    score: 200
+    attack_id: T1027
+  - heur_id: 2
+    name: Embedded payload reconstructed
+    description: A payload was successfully reconstructed and decoded from an obfuscated/split base64 blob embedded in this script.
+    filetype: ".*"
+    score: 100
+    max_score: 1000
+    signature_score_map:
+      executable: 400
+      script_or_text: 200
+      other: 100
+  - heur_id: 3
+    name: WMI hidden-window process creation recognized
+    description: The script uses WMI (Win32_Process.Create) with a hidden ShowWindow setting in the same statement to launch a process without a visible window -- recognized, never performed.
+    filetype: ".*"
+    score: 250
+    attack_id: T1047
+  - heur_id: 4
+    name: Reflective .NET assembly load recognized
+    description: The script embeds a PowerShell command that reflectively loads a .NET assembly directly into memory ([AppDomain]::CurrentDomain.Load) -- recognized, never performed.
+    filetype: ".*"
+    score: 350
+    attack_id: T1620
+  - heur_id: 5
+    name: VBScript dynamic code execution recognized
+    description: The script uses VBScript's own dynamic-code-execution builtins (Execute/ExecuteGlobal/Eval) on a non-literal (dynamically built) argument -- recognized, never performed.
+    filetype: ".*"
+    score: 250
+    attack_id: T1059.005
+  - heur_id: 6
+    name: Corroborated scheduled-task persistence recognized
+    description: The script registers a scheduled task alongside a hidden-window or boot-triggered signal, consistent with persistence/re-infection rather than an ordinary installer task -- recognized, never performed.
+    filetype: ".*"
+    score: 250
+    attack_id: T1053.005
+  - heur_id: 7
+    name: Candidate encrypted literal(s) found for cross-service use
+    description: Long base64-shaped literal argument(s) were found passed into a reflective static-method invocation -- often a reflectively-loaded payload's own encrypted config. Stored for a sibling service to attempt decryption against.
+    filetype: ".*"
+    score: 0
+
+docker_config:
+  image: kylemc54321/assemblyline-service-vbssim:$SERVICE_TAG
+  cpu_cores: 1
+  ram_mb_min: 128
+  ram_mb: 512
+  allow_internet_access: false

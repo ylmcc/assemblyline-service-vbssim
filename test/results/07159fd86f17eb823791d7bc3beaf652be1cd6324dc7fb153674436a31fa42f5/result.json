@@ -1,0 +1,259 @@
+{
+  "extra": {
+    "drop_file": false,
+    "score": 1500,
+    "sections": [
+      {
+        "auto_collapse": false,
+        "body": "A 3-character junk filler was found interspersed 315 times throughout the script, padding what is likely a hidden base64-encoded payload to defeat naive string/YARA extraction. The filler has been stripped for analysis below.",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [
+            "T1027"
+          ],
+          "frequency": 1,
+          "heur_id": 1,
+          "score": 200,
+          "score_map": {},
+          "signatures": {
+            "junk_filler_obfuscation": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Junk-character obfuscation detected and stripped",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": {
+          "sha256": "6f2456aafceae0aad95b7eb863993fd3a7cef067525bf188656b77e0aa4efec8",
+          "size": 235,
+          "sniffed_type": "text/plain"
+        },
+        "body_config": {},
+        "body_format": "KEY_VALUE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 2,
+          "score": 200,
+          "score_map": {},
+          "signatures": {
+            "script_or_text": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Embedded payload reconstructed",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "p\").SpawnInstance_\nobjStartup.ShowWindow = 0\nSet objProcess = objWMI.Get(\"Win32_Process\")\nobjProcess.Create \"cmd.exe\", Null, objStartup,",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [
+            "T1047"
+          ],
+          "frequency": 1,
+          "heur_id": 3,
+          "score": 250,
+          "score_map": {},
+          "signatures": {
+            "wmi_hidden_process": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "WMI hidden-window process creation recognized (not performed)",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "\u0f10\u139f=\u2b0c\u0f10\u139f\"\n\npowershell -Command \"[AppDomain]::CurrentDomain.Load($bytes) | Out-Null; [qqqqq.qqq",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [
+            "T1620"
+          ],
+          "frequency": 1,
+          "heur_id": 4,
+          "score": 350,
+          "score_map": {},
+          "signatures": {
+            "reflective_dotnet_load": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Reflective .NET assembly load recognized (not performed)",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "mmand = \"Wsc\" & \"ript.Echo 1\"\nExecute(builtCommand)",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [
+            "T1059.005"
+          ],
+          "frequency": 1,
+          "heur_id": 5,
+          "score": 250,
+          "score_map": {},
+          "signatures": {
+            "vbs_dynamic_exec": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "VBScript dynamic code execution recognized (not performed)",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "tartup, intPID\n\nSet service = CreateObject(\"Schedule.Service\")\ntaskDefinition.Triggers.Add(n\n\n(Registers a BootTrigger -- survives reboots.)",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [
+            "T1053.005"
+          ],
+          "frequency": 1,
+          "heur_id": 6,
+          "score": 250,
+          "score_map": {},
+          "signatures": {
+            "boot_persistent": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Scheduled-task persistence recognized (not performed)",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": "1 long base64-shaped literal argument(s) were found passed into a `[Namespace.Class]::Method(...)` static invocation -- often how a reflectively-loaded payload's own encrypted config is supplied, since it may never appear as a string constant in the loaded assembly itself. Stored in temp_submission_data for a sibling service to attempt decryption against.",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 7,
+          "score": 0,
+          "score_map": {},
+          "signatures": {
+            "candidate_ciphertext_literals": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Candidate encrypted literal(s) passed to a reflective invocation",
+        "zeroize_on_tag_safe": false
+      }
+    ]
+  },
+  "files": {
+    "extracted": [
+      {
+        "name": "07159fd86f17eb823791d7bc3beaf652be1cd6324dc7fb153674436a31fa42f5_reconstructed.bin",
+        "sha256": "6f2456aafceae0aad95b7eb863993fd3a7cef067525bf188656b77e0aa4efec8"
+      }
+    ],
+    "supplementary": [
+      {
+        "name": "vbssim_findings_log.json",
+        "sha256": "efb25f3980b70240e43a6ec1c78c561b327f78acb305455ab53f039bed360f68"
+      }
+    ]
+  },
+  "results": {
+    "heuristics": [
+      {
+        "attack_ids": [
+          "T1027"
+        ],
+        "heur_id": 1,
+        "signatures": [
+          "junk_filler_obfuscation"
+        ]
+      },
+      {
+        "attack_ids": [],
+        "heur_id": 2,
+        "signatures": [
+          "script_or_text"
+        ]
+      },
+      {
+        "attack_ids": [
+          "T1047"
+        ],
+        "heur_id": 3,
+        "signatures": [
+          "wmi_hidden_process"
+        ]
+      },
+      {
+        "attack_ids": [
+          "T1620"
+        ],
+        "heur_id": 4,
+        "signatures": [
+          "reflective_dotnet_load"
+        ]
+      },
+      {
+        "attack_ids": [
+          "T1059.005"
+        ],
+        "heur_id": 5,
+        "signatures": [
+          "vbs_dynamic_exec"
+        ]
+      },
+      {
+        "attack_ids": [
+          "T1053.005"
+        ],
+        "heur_id": 6,
+        "signatures": [
+          "boot_persistent"
+        ]
+      },
+      {
+        "attack_ids": [],
+        "heur_id": 7,
+        "signatures": [
+          "candidate_ciphertext_literals"
+        ]
+      }
+    ],
+    "tags": {},
+    "temp_submission_data": {
+      "vbssim_candidate_ciphertexts": [
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      ]
+    }
+  }
+}
