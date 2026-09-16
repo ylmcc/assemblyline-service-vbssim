@@ -57,3 +57,15 @@ RE_POWERSHELL_STATIC_INVOKE = re.compile(
     r"\[([A-Za-z0-9_.]+)\]::([A-Za-z0-9_]+)\(([^)]*)\)"
 )
 RE_QUOTED_LONG_BASE64_LITERAL = re.compile(r"'([A-Za-z0-9+/=]{40,})'")
+
+# A PowerShell-style Authenticode "signature block" (the trailing comment format
+# Set-AuthenticodeSignature writes into a *.ps1*, normally "# SIG # Begin/End
+# signature block") -- confirmed on a real sample: this exact marker text (using
+# VBS's `''` comment prefix instead of PowerShell's `#`) was pasted into a *.vbs*
+# file, which has no such convention and never verifies or even parses it. VBS
+# doesn't support script signing at all, so its mere presence in a code/vbs file
+# is itself the signal -- it exists purely to make the file look digitally signed
+# to a human skimming it or a naive automated trust check, not because anything
+# will ever validate it.
+RE_FAKE_SIGNATURE_BLOCK_BEGIN = re.compile(r"Begin signature block", re.IGNORECASE)
+RE_FAKE_SIGNATURE_BLOCK_END = re.compile(r"End signature block", re.IGNORECASE)

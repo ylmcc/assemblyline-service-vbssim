@@ -46,6 +46,13 @@ def scan(text: str) -> list[Finding]:
                 _snippet(text, task_match.start(), task_match.end()),
             ))
 
+    begin_match = p.RE_FAKE_SIGNATURE_BLOCK_BEGIN.search(text)
+    if begin_match and p.RE_FAKE_SIGNATURE_BLOCK_END.search(text):
+        findings.append(Finding(
+            "fake_signature_block", {},
+            _snippet(text, begin_match.start(), begin_match.end()),
+        ))
+
     return findings
 
 

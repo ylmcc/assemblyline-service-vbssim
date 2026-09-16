@@ -1,10 +1,14 @@
-"""VBSSim: statically detects and undoes a real, observed VBScript obfuscation
-technique (interspersing every real character of an embedded base64 payload with a
-long junk filler, to defeat naive string/YARA extraction), reconstructs and
-extracts the hidden payload, and recognizes (without ever performing) dangerous
-WSH/PowerShell idioms: hidden-window process creation (WMI/WScript.Shell),
-reflective .NET assembly loading, VBScript's own dynamic-code-execution builtins,
-and scheduled-task persistence.
+"""VBSSim: statically detects and undoes three real, observed VBScript
+junk-filler obfuscation techniques -- interspersing every character of an
+embedded base64 payload with a long junk filler; splicing a short marker token
+into otherwise-plaintext/hex string fragments passed to a custom "decode"
+function; and splitting a base64 blob across many lines each prefixed with a
+repeated marker (mimicking a real PowerShell/Authenticode "signature block") --
+reconstructs and extracts the hidden payload, and recognizes (without ever
+performing) dangerous WSH/PowerShell idioms: hidden-window process creation
+(WMI/WScript.Shell), reflective .NET assembly loading, VBScript's own
+dynamic-code-execution builtins, scheduled-task persistence, and a fake/
+inapplicable digital-signature block used as camouflage.
 
 No VBScript interpreter is ever invoked, no `Execute`/`Eval`/`ExecuteGlobal` is ever
 called on script content, and no subprocess is ever spawned by this service --
@@ -28,6 +32,7 @@ _KIND_TO_HEURISTIC = {
     "wmi_hidden_process": (3, "T1047"),
     "reflective_dotnet_load": (4, "T1620"),
     "vbs_dynamic_exec": (5, "T1059.005"),
+    "fake_signature_block": (8, "T1036.001"),
 }
 
 
@@ -127,6 +132,7 @@ class VBSSim(ServiceBase):
             "wmi_hidden_process": "WMI hidden-window process creation recognized (not performed)",
             "reflective_dotnet_load": "Reflective .NET assembly load recognized (not performed)",
             "vbs_dynamic_exec": "VBScript dynamic code execution recognized (not performed)",
+            "fake_signature_block": "Fake/inapplicable digital-signature block detected",
         }
         for kind, items in by_kind.items():
             if kind not in _KIND_TO_HEURISTIC:

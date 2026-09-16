@@ -73,6 +73,12 @@ heuristics:
     description: Long base64-shaped literal argument(s) were found passed into a reflective static-method invocation -- often a reflectively-loaded payload's own encrypted config. Stored for a sibling service to attempt decryption against.
     filetype: ".*"
     score: 0
+  - heur_id: 8
+    name: Fake/inapplicable digital-signature block detected
+    description: A PowerShell/Authenticode-style "signature block" comment (as written by Set-AuthenticodeSignature) was found in a VBScript file, which has no such convention and never parses or verifies it -- present purely to make the file look digitally signed.
+    filetype: ".*"
+    score: 200
+    attack_id: T1036.001
 
 docker_config:
   image: kylemc54321/assemblyline-service-vbssim:$SERVICE_TAG

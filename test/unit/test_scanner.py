@@ -84,6 +84,27 @@ def test_benign_script_has_no_findings():
     assert scan(script) == []
 
 
+def test_fake_signature_block_detected():
+    # Confirmed on a real sample: VBS has no script-signing convention and never
+    # parses this, so its mere presence is the signal, regardless of content.
+    script = '''
+    WScript.Echo "hello"
+    '' SIG '' Begin signature block
+    '' SIG '' not a real certificate, just placeholder text
+    '' SIG '' End signature block
+    '''
+    kinds = [f.kind for f in scan(script)]
+    assert "fake_signature_block" in kinds
+
+
+def test_signature_block_begin_without_end_not_flagged():
+    # Regression guard: require both markers so a truncated/partial match (or
+    # unrelated text that happens to mention "begin" near "signature") doesn't fire.
+    script = "'' SIG '' Begin signature block\nWScript.Echo \"no end marker here\""
+    kinds = [f.kind for f in scan(script)]
+    assert "fake_signature_block" not in kinds
+
+
 def test_extract_powershell_invoke_literals():
     long_b64 = "A" * 60
     short_arg = "AB"

@@ -77,6 +77,69 @@ def test_reconstruct_embedded_payload_without_filler_still_works():
     assert filler_result.filler is None
 
 
+# ---------------------------------------------------------------------------
+# Scattered short-token filler (spliced within long runs, not between every
+# single character) -- confirmed on a real sample: a custom "decode" function
+# was called repeatedly with strings like "SYSTEMROddpfnIIOT", each carrying a
+# short, mixed-case marker token scattered every few characters.
+# ---------------------------------------------------------------------------
+
+_SCATTERED_TOKEN = "qzTr9k"
+
+
+def _splice_every_n(content: str, filler: str, n: int = 5) -> str:
+    return filler.join(content[i:i + n] for i in range(0, len(content), n))
+
+
+def test_detect_and_strip_filler_finds_scattered_token_within_runs():
+    b64 = base64.b64encode(_SYNTHETIC_PAYLOAD).decode()
+    obfuscated = _splice_every_n(b64, _SCATTERED_TOKEN)
+    result = detect_and_strip_filler(obfuscated, min_repeats=10)
+    assert result.filler == _SCATTERED_TOKEN
+    padded = result.cleaned_text + "=" * (-len(result.cleaned_text) % 4)
+    assert base64.b64decode(padded) == _SYNTHETIC_PAYLOAD
+
+
+def test_scattered_token_detector_ignores_diverse_ordinary_identifiers():
+    # Regression guard: plenty of long-ish, distinct (never-repeated) identifiers
+    # must not make any short substring look like a dominant, deliberate filler.
+    text = "\n".join(f"variableNameNumber{i}CallSomethingElse" for i in range(300))
+    result = detect_and_strip_filler(text, min_repeats=10)
+    assert result.filler is None
+
+
+# ---------------------------------------------------------------------------
+# Per-line marker/prefix filler (a base64 blob split across many short lines,
+# each carrying a repeated marker) -- confirmed on a real sample: a fake
+# PowerShell/Authenticode "signature block" ("'' SIG '' <fragment>" on every
+# line) was pasted into a *.vbs* file specifically to camouflage an embedded
+# blob as a legitimate digital signature.
+# ---------------------------------------------------------------------------
+
+_LINE_MARKER = "~~MARK~~ "
+
+
+def _wrap_as_marked_lines(b64_text: str, marker: str, width: int = 44) -> str:
+    lines = [b64_text[i:i + width] for i in range(0, len(b64_text), width)]
+    return "\n".join(f"{marker}{line}" for line in lines) + "\n"
+
+
+def test_detect_and_strip_filler_finds_line_prefix_marker():
+    b64 = base64.b64encode(_SYNTHETIC_PAYLOAD).decode()
+    obfuscated = _wrap_as_marked_lines(b64, _LINE_MARKER)
+    result = detect_and_strip_filler(obfuscated, min_repeats=5)
+    assert result.filler == _LINE_MARKER
+    chunks = extract_ordered_base64_chunks(result.cleaned_text, min_chunk_len=len(b64))
+    assert decode_concatenated_base64(chunks) == _SYNTHETIC_PAYLOAD
+
+
+def test_line_prefix_marker_below_min_repeats_not_flagged():
+    b64 = base64.b64encode(_SYNTHETIC_PAYLOAD).decode()
+    obfuscated = _wrap_as_marked_lines(b64, _LINE_MARKER)
+    result = detect_and_strip_filler(obfuscated, min_repeats=10_000)
+    assert result.filler is None
+
+
 def test_cleaned_text_reveals_findings_hidden_by_filler():
     # Real bug found on a live submission: the junk filler observed on a real
     # sample is interspersed through the *entire* script, not just the embedded
