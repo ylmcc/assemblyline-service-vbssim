@@ -77,6 +77,19 @@ class VBSSim(ServiceBase):
             filler_section.set_heuristic(1, signature="junk_filler_obfuscation")
             result.add_section(filler_section)
 
+        # temp_submission_data must be set BEFORE add_extracted() -- it propagates to
+        # the *subsequent tasks resulting from* adding an extracted file, so setting
+        # it after the child task was already created misses the child entirely.
+        # (Real bug found this session: DotnetConfigDecryptor never saw these
+        # literals on a live submission because this was originally ordered the
+        # other way around.)
+        invoke_literals = extract_powershell_invoke_literals(text)
+        candidate_ciphertexts = sorted({
+            literal for inv in invoke_literals for literal in inv["candidate_literals"]
+        })
+        if candidate_ciphertexts:
+            request.temp_submission_data["vbssim_candidate_ciphertexts"] = candidate_ciphertexts
+
         if decoded:
             out_path = os.path.join(self.working_directory, f"{request.sha256}_reconstructed.bin")
             with open(out_path, "wb") as f:
@@ -126,12 +139,7 @@ class VBSSim(ServiceBase):
             sched_section.set_heuristic(6, signature="boot_persistent" if boot_trigger else "scheduled_task")
             result.add_section(sched_section)
 
-        invoke_literals = extract_powershell_invoke_literals(text)
-        candidate_ciphertexts = sorted({
-            literal for inv in invoke_literals for literal in inv["candidate_literals"]
-        })
         if candidate_ciphertexts:
-            request.temp_submission_data["vbssim_candidate_ciphertexts"] = candidate_ciphertexts
             lit_section = ResultSection(
                 "Candidate encrypted literal(s) passed to a reflective invocation",
                 body=f"{len(candidate_ciphertexts)} long base64-shaped literal argument(s) were found "
