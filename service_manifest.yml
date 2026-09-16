@@ -13,7 +13,7 @@ description: >
   corroborated scheduled-task persistence, and a fake/inapplicable digital-
   signature block used as camouflage. No VBScript interpreter is ever invoked.
 
-accepts: code/vbs
+accepts: code/.*
 rejects: empty|metadata/.*
 
 stage: CORE
