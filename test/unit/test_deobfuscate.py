@@ -50,9 +50,10 @@ def test_low_repeat_count_is_not_treated_as_filler():
 
 
 def test_extract_ordered_base64_chunks_preserves_document_order():
-    text = "prefix " + ("A" * 250) + " middle " + ("B" * 250) + " suffix"
+    # Non-hex letters: a pure-hex run is deliberately not treated as base64.
+    text = "prefix " + ("G" * 250) + " middle " + ("H" * 250) + " suffix"
     chunks = extract_ordered_base64_chunks(text, min_chunk_len=200)
-    assert chunks == ["A" * 250, "B" * 250]
+    assert chunks == ["G" * 250, "H" * 250]
 
 
 def test_decode_concatenated_base64_handles_split_chunks():

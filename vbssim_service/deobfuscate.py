@@ -11,6 +11,7 @@ import re
 from collections import Counter
 
 _BASE64_ALPHABET_RUN_RE = re.compile(r"[A-Za-z0-9+/=]{200,}")
+_HEX_ONLY_RE = re.compile(r"[0-9A-Fa-f]+")
 
 # Candidate lengths tried by _detect_scattered_token_filler when hunting for a
 # short marker token repeated *within* long alphanumeric runs.
@@ -22,6 +23,10 @@ _MAX_SCATTERED_SCAN_CHARS = 300_000
 # nothing) before it -- used to find a per-line marker/prefix repeated across many
 # lines, each carrying a fragment of a longer base64 blob.
 _LINE_MARKER_RE = re.compile(r"^(.*?)([A-Za-z0-9+/=]{8,})[ \t]*$")
+
+# DER encoding of the PKCS#7 SignedData OID (1.2.840.113549.1.7.2) -- the first
+# thing inside a real Authenticode signature blob.
+_PKCS7_SIGNED_DATA_OID = bytes.fromhex("06092a864886f70d010702")
 
 
 @dataclasses.dataclass
@@ -117,6 +122,15 @@ def _detect_scattered_token_filler(text: str, min_repeats: int) -> FillerStripRe
     return FillerStripResult(text.replace(best_token, ""), best_token, occurrences)
 
 
+def _is_pkcs7_signed_data(b64_text: str) -> bool:
+    padded = b64_text + "=" * (-len(b64_text) % 4)
+    try:
+        der = base64.b64decode(padded, validate=False)
+    except (base64.binascii.Error, ValueError):
+        return False
+    return der[:1] == b"\x30" and _PKCS7_SIGNED_DATA_OID in der[:24]
+
+
 def _detect_line_prefix_marker_filler(text: str, min_repeats: int) -> FillerStripResult:
     """Detects a short literal marker repeated as a per-line prefix immediately
     before a base64 fragment -- e.g. a fake PowerShell/VBS "signature block"
@@ -129,6 +143,13 @@ def _detect_line_prefix_marker_filler(text: str, min_repeats: int) -> FillerStri
     Requires the marker to recur on at least `min_repeats` lines AND the
     recovered payload fragments to total at least 200 characters, so an ordinary
     handful of similarly-prefixed log/config lines doesn't get misidentified.
+
+    A block whose fragments decode to a real PKCS#7 SignedData structure is NOT
+    treated as filler: that's the genuine format WSH/signtool write when signing a
+    .vbs/.js/.ps1 (`'' SIG '' ` per line), not a hidden payload. Confirmed on a
+    real sample: treating a (self-signed) Authenticode block as filler made this
+    service "reconstruct" the signature DER, mixed with an unrelated base64 run,
+    as a garbage payload.
     """
     prefix_counts: Counter[str] = Counter()
     for line in text.splitlines():
@@ -144,16 +165,17 @@ def _detect_line_prefix_marker_filler(text: str, min_repeats: int) -> FillerStri
         return FillerStripResult(text, None, 0)
 
     cleaned_lines = []
-    total_payload_len = 0
+    fragments = []
     for line in text.splitlines():
         m = _LINE_MARKER_RE.match(line)
         if m and m.group(1) == marker:
             cleaned_lines.append(m.group(2))
-            total_payload_len += len(m.group(2))
+            fragments.append(m.group(2))
         else:
             cleaned_lines.append(line + "\n")
 
-    if total_payload_len < 200:
+    payload = "".join(fragments)
+    if len(payload) < 200 or _is_pkcs7_signed_data(payload):
         return FillerStripResult(text, None, 0)
 
     return FillerStripResult("".join(cleaned_lines), marker, count)
@@ -178,8 +200,15 @@ def extract_ordered_base64_chunks(text: str, min_chunk_len: int = 200) -> list[s
     """Long base64-alphabet runs, in the order they appear in the document -- a
     payload can be split across multiple adjacent string-literal chunks (VBS
     `a = a & "..."`-style concatenation), so document order must be preserved for
-    concatenation to reconstruct the original bytes correctly."""
-    return [m.group(0) for m in re.finditer(rf"[A-Za-z0-9+/=]{{{min_chunk_len},}}", text)]
+    concatenation to reconstruct the original bytes correctly.
+
+    Runs made only of hex digits are skipped: they're hex-encoded data (e.g. the
+    argument to a hex-XOR string decoder), not base64 -- a genuine 200+ character
+    base64 run containing no letter above F/f essentially never happens. Confirmed
+    on a real sample: a long hex argument was being base64-"decoded" into a
+    garbage extracted file."""
+    return [m.group(0) for m in re.finditer(rf"[A-Za-z0-9+/=]{{{min_chunk_len},}}", text)
+            if not _HEX_ONLY_RE.fullmatch(m.group(0))]
 
 
 def decode_concatenated_base64(chunks: list[str]) -> bytes | None:

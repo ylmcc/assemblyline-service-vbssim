@@ -8,7 +8,10 @@ reconstructs and extracts the hidden payload, and recognizes (without ever
 performing) dangerous WSH/PowerShell idioms: hidden-window process creation
 (WMI/WScript.Shell), reflective .NET assembly loading, VBScript's own
 dynamic-code-execution builtins, scheduled-task persistence, and a fake/
-inapplicable digital-signature block used as camouflage.
+inapplicable digital-signature block used as camouflage. Also decodes calls to a
+hex-pair XOR string-decoder function and recovers a script payload assembled from
+literal string fragments and handed to another interpreter through a process
+environment variable (e.g. `cmd /c echo %VAR% | powershell -`).
 
 No VBScript interpreter is ever invoked, no `Execute`/`Eval`/`ExecuteGlobal` is ever
 called on script content, and no subprocess is ever spawned by this service --
@@ -27,6 +30,7 @@ from assemblyline_v4_service.common.result import Heuristic, Result, ResultKeyVa
 
 from vbssim_service.deobfuscate import reconstruct_embedded_payload
 from vbssim_service.scanner import extract_powershell_invoke_literals, scan
+from vbssim_service.staging import decode_hex_xor_strings, find_env_staged_payloads
 
 _KIND_TO_HEURISTIC = {
     "wmi_hidden_process": (3, "T1047"),
@@ -103,6 +107,46 @@ class VBSSim(ServiceBase):
         if candidate_ciphertexts:
             request.temp_submission_data["vbssim_candidate_ciphertexts"] = candidate_ciphertexts
 
+        # Hex-XOR decoded strings are typically what the script later `Execute`s --
+        # the statements that stage and launch a payload may exist only there.
+        decoded_strings = decode_hex_xor_strings(clean_text)
+        if decoded_strings:
+            audit_log["hex_xor_decoded_strings"] = decoded_strings
+            xor_section = ResultSection(
+                "Hex/XOR-encoded strings decoded",
+                body="\n".join(decoded_strings[:50]),
+            )
+            xor_section.set_heuristic(10, signature="hex_xor_strings")
+            result.add_section(xor_section)
+
+        staged = find_env_staged_payloads(clean_text, decoded_strings)
+        for i, payload in enumerate(staged):
+            ext = "ps1" if payload.looks_like_powershell else "txt"
+            name = f"{payload.env_name}_env_payload.{ext}"
+            out_path = os.path.join(self.working_directory, f"staged_{i}_{name}")
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(payload.content)
+            added = request.add_extracted(
+                out_path, name,
+                f"Script assembled in variable {payload.source_variable} and staged through "
+                f"environment variable {payload.env_name}",
+            )
+            if not added:
+                continue
+            staged_section = ResultKeyValueSection("Script payload staged through a process environment variable")
+            staged_section.set_item("environment_variable", payload.env_name)
+            staged_section.set_item("source_variable", payload.source_variable)
+            staged_section.set_item("literal_fragments", payload.fragments)
+            staged_section.set_item("size", len(payload.content))
+            staged_section.set_item("launcher", payload.launcher or "(not found)")
+            staged_section.set_item("cmd_caret_escapes_removed", payload.cmd_caret_unescaped)
+            staged_section.set_heuristic(9, signature="powershell" if payload.looks_like_powershell else "other_script")
+            result.add_section(staged_section)
+            audit_log.setdefault("env_staged_payloads", []).append({
+                "environment_variable": payload.env_name, "source_variable": payload.source_variable,
+                "size": len(payload.content), "launcher": payload.launcher, "extracted_as": name,
+            })
+
         if decoded:
             out_path = os.path.join(self.working_directory, f"{request.sha256}_reconstructed.bin")
             with open(out_path, "wb") as f:
@@ -123,7 +167,7 @@ class VBSSim(ServiceBase):
                 result.add_section(payload_section)
                 audit_log["decoded_payload_sniffed_type"] = sniffed_type
 
-        findings = scan(clean_text)
+        findings = scan("\n".join([clean_text, *decoded_strings]))
         by_kind: dict[str, list] = {}
         for finding in findings:
             by_kind.setdefault(finding.kind, []).append(finding)

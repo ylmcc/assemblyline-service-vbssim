@@ -1,0 +1,97 @@
+{
+  "extra": {
+    "drop_file": false,
+    "score": 500,
+    "sections": [
+      {
+        "auto_collapse": false,
+        "body": "Sh.Environment(\"Process\").Item(\"STAGEVAR\") = Staged\nSh.Run(\"cmd.exe /v:on /c echo ^%STAGEVAR^% | !PSPATH! -\", 0)",
+        "body_config": {},
+        "body_format": "TEXT",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 10,
+          "score": 0,
+          "score_map": {},
+          "signatures": {
+            "hex_xor_strings": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Hex/XOR-encoded strings decoded",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": {
+          "cmd_caret_escapes_removed": true,
+          "environment_variable": "STAGEVAR",
+          "launcher": "Sh.Run(\"cmd.exe /v:on /c echo ^%STAGEVAR^% | !PSPATH! -\", 0)",
+          "literal_fragments": 4,
+          "size": 187,
+          "source_variable": "Staged"
+        },
+        "body_config": {},
+        "body_format": "KEY_VALUE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [
+            "T1059.001"
+          ],
+          "frequency": 1,
+          "heur_id": 9,
+          "score": 500,
+          "score_map": {},
+          "signatures": {
+            "powershell": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Script payload staged through a process environment variable",
+        "zeroize_on_tag_safe": false
+      }
+    ]
+  },
+  "files": {
+    "extracted": [
+      {
+        "name": "STAGEVAR_env_payload.ps1",
+        "sha256": "5ac72d9c894c013c6c21c66283f0ab659c50bdf38b64b31f5d153cdfc63510cd"
+      }
+    ],
+    "supplementary": [
+      {
+        "name": "vbssim_findings_log.json",
+        "sha256": "2149e6ccc7a5dbf2ced977cded0005092cc8111296aa55963dcdd172e3217f3e"
+      }
+    ]
+  },
+  "results": {
+    "heuristics": [
+      {
+        "attack_ids": [
+          "T1059.001"
+        ],
+        "heur_id": 9,
+        "signatures": [
+          "powershell"
+        ]
+      },
+      {
+        "attack_ids": [],
+        "heur_id": 10,
+        "signatures": [
+          "hex_xor_strings"
+        ]
+      }
+    ],
+    "tags": {},
+    "temp_submission_data": {}
+  }
+}

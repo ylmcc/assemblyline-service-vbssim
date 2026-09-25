@@ -11,7 +11,10 @@ description: >
   dangerous WSH/PowerShell idioms: hidden-window WMI process creation, reflective
   .NET assembly loading, VBScript's own dynamic-code-execution builtins,
   corroborated scheduled-task persistence, and a fake/inapplicable digital-
-  signature block used as camouflage. No VBScript interpreter is ever invoked.
+  signature block used as camouflage. Also decodes hex-pair XOR string-decoder
+  calls and extracts a script payload staged through a process environment
+  variable (e.g. `cmd /c echo %VAR% | powershell -`). No VBScript interpreter is
+  ever invoked.
 
 accepts: code/.*
 rejects: empty|metadata/.*
@@ -83,6 +86,20 @@ heuristics:
     filetype: ".*"
     score: 200
     attack_id: T1036.001
+  - heur_id: 9
+    name: Script payload staged through a process environment variable
+    description: A script assembled from literal string fragments is placed into a process environment variable and consumed by another interpreter (e.g. `cmd /c echo %VAR% | powershell -`), so the payload never touches disk or appears on a command line. The payload is extracted -- never executed.
+    filetype: ".*"
+    score: 300
+    signature_score_map:
+      powershell: 500
+      other_script: 300
+    attack_id: T1059.001
+  - heur_id: 10
+    name: Hex/XOR-encoded strings decoded
+    description: Calls to a hex-pair XOR string-decoder function were statically decoded; the decoded strings are shown for analysis and scanned alongside the script.
+    filetype: ".*"
+    score: 0
 
 docker_config:
   image: kylemc54321/assemblyline-service-vbssim:$SERVICE_TAG
